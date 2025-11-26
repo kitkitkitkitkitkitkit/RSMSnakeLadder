@@ -1,0 +1,384 @@
+import React, { useState } from 'react';
+import { Dices, Trophy, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const SnakeLadderGame = () => {
+  const [positions, setPositions] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
+  const [currentTeam, setCurrentTeam] = useState('red');
+  const [diceValue, setDiceValue] = useState(null);
+  const [winner, setWinner] = useState(null);
+  const [gameLog, setGameLog] = useState([]);
+  const [animatingTeam, setAnimatingTeam] = useState(null);
+
+  const teams = ['red', 'blue', 'green', 'yellow'];
+  const teamColors = {
+    red: '#EF4444',
+    blue: '#3B82F6',
+    green: '#10B981',
+    yellow: '#F59E0B'
+  };
+
+  const ladders = {
+    9: 11
+  };
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const animateMovement = async (team, startPos, endPos) => {
+    setAnimatingTeam(team);
+    
+    // Move step by step from start to end
+    for (let i = startPos + 1; i <= endPos; i++) {
+      setPositions(prev => ({
+        ...prev,
+        [team]: i
+      }));
+      await sleep(400); // Pause at each stop
+    }
+    
+    setAnimatingTeam(null);
+  };
+
+  const moveTeam = async (team, newPosition) => {
+    setAnimatingTeam(team);
+    await sleep(400);
+    setPositions(prev => ({
+      ...prev,
+      [team]: newPosition
+    }));
+    setAnimatingTeam(null);
+  };
+
+  const rollDice = async () => {
+    if (winner) return;
+
+    const roll = Math.floor(Math.random() * 6) + 1;
+    setDiceValue(roll);
+
+    const startPos = positions[currentTeam];
+    const newPosition = startPos + roll;
+    let finalPosition = newPosition;
+
+    if (newPosition > 12) {
+      finalPosition = startPos;
+      setGameLog(prev => [`${currentTeam.toUpperCase()} rolled ${roll} but can't move past finish!`, ...prev.slice(0, 4)]);
+    } else {
+      // Animate step-by-step movement
+      await animateMovement(currentTeam, startPos, newPosition);
+      
+      // Check for ladder
+      if (ladders[newPosition]) {
+        finalPosition = ladders[newPosition];
+        setGameLog(prev => [`${currentTeam.toUpperCase()} rolled ${roll}, landed on ${newPosition}, climbed ladder to ${finalPosition}! 🪜`, ...prev.slice(0, 4)]);
+        await sleep(600);
+        await animateMovement(currentTeam, newPosition, finalPosition);
+      } else {
+        setGameLog(prev => [`${currentTeam.toUpperCase()} rolled ${roll} and moved to ${finalPosition}`, ...prev.slice(0, 4)]);
+      }
+
+      // Check for win
+      if (finalPosition === 12) {
+        setWinner(currentTeam);
+        setGameLog(prev => [`🎉 ${currentTeam.toUpperCase()} WINS! 🎉`, ...prev]);
+      }
+    }
+
+    // Move to next team
+    const nextTeamIndex = (teams.indexOf(currentTeam) + 1) % teams.length;
+    setCurrentTeam(teams[nextTeamIndex]);
+  };
+
+  const manualMove = (team, direction) => {
+    const currentPos = positions[team];
+    const newPos = direction === 'forward' ? currentPos + 1 : currentPos - 1;
+    
+    if (newPos < 0 || newPos > 12) return;
+    
+    moveTeam(team, newPos);
+    setGameLog(prev => [`${team.toUpperCase()} manually moved to ${newPos}`, ...prev.slice(0, 4)]);
+    
+    if (newPos === 12) {
+      setWinner(team);
+      setGameLog(prev => [`🎉 ${team.toUpperCase()} WINS! 🎉`, ...prev]);
+    }
+  };
+
+  const resetGame = () => {
+    setPositions({ red: 0, blue: 0, green: 0, yellow: 0 });
+    setCurrentTeam('red');
+    setDiceValue(null);
+    setWinner(null);
+    setGameLog([]);
+    setAnimatingTeam(null);
+  };
+
+  const getTeamsAtPosition = (pos) => {
+    return teams.filter(team => positions[team] === pos);
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800"
+      >
+        <div 
+          className="absolute inset-0 bg-center bg-no-repeat"
+          style={{
+            backgroundImage: 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")',
+            /*filter: 'opacity(0.1)',
+            backgroundSize: '400px',
+            backgroundPosition: 'center'*/
+          }}
+        />
+      </div>
+      
+      {/* Content */}
+      <div className="relative z-10 p-8">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-5xl font-bold text-center text-white mb-2 drop-shadow-lg">
+            🎲 Snake and Ladder 🎲
+          </h1>
+          <p className="text-center text-purple-200 mb-8 text-lg">New Year Party Game</p>
+
+          {/* Main Layout - Board and Controls Side by Side */}
+          <div className="grid lg:grid-cols-3 gap-6 mb-6">
+            {/* Game Board - Takes 2 columns */}
+            <div className="lg:col-span-2 bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8">
+              <div className="relative">
+                {/* Board Path */}
+                <div className="grid grid-cols-6 gap-4 relative">
+                  {/* Ladder visualization */}
+                  <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+                    <defs>
+                      <linearGradient id="ladderGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style={{ stopColor: '#10B981', stopOpacity: 0.8 }} />
+                        <stop offset="100%" style={{ stopColor: '#059669', stopOpacity: 0.8 }} />
+                      </linearGradient>
+                    </defs>
+                    <g>
+                      <line 
+                        x1="31%" y1="75%" 
+                        x2="65%" y2="75%" 
+                        stroke="url(#ladderGradient)" 
+                        strokeWidth="8" 
+                        strokeLinecap="round"
+                      />
+                      <line 
+                        x1="31%" y1="65%" 
+                        x2="65%" y2="65%" 
+                        stroke="url(#ladderGradient)" 
+                        strokeWidth="8" 
+                        strokeLinecap="round"
+                      />
+                      <line x1="35%" y1="65%" x2="35%" y2="75%" stroke="url(#ladderGradient)" strokeWidth="6" />
+                      <line x1="42%" y1="65%" x2="42%" y2="75%" stroke="url(#ladderGradient)" strokeWidth="6" />
+                      <line x1="48%" y1="65%" x2="48%" y2="75%" stroke="url(#ladderGradient)" strokeWidth="6" />
+                      <line x1="54%" y1="65%" x2="54%" y2="75%" stroke="url(#ladderGradient)" strokeWidth="6" />
+                      <line x1="61%" y1="65%" x2="61%" y2="75%" stroke="url(#ladderGradient)" strokeWidth="6" />
+                    </g>
+                  </svg>
+
+                  {[...Array(12)].map((_, i) => {
+                    const position = i + 1;
+                    const teamsHere = getTeamsAtPosition(position);
+                    const hasLadder = position === 9;
+
+                    return (
+                      <div key={i} className="relative">
+                        <div className={`aspect-square rounded-2xl border-4 flex items-center justify-center text-2xl font-bold relative overflow-hidden transition-all duration-300
+                          ${position === 12 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-600 shadow-lg' : 
+                            hasLadder ? 'bg-gradient-to-br from-green-100 to-green-200 border-green-400' :
+                            'bg-gradient-to-br from-blue-50 to-purple-50 border-purple-300'}`}>
+                          
+                          <span className={`absolute top-1 left-2 text-lg ${position === 12 ? 'text-white' : 'text-gray-600'}`}>
+                            {position}
+                          </span>
+
+                          {position === 12 && (
+                            <Trophy className="w-12 h-12 text-white drop-shadow-lg" />
+                          )}
+
+                          {teamsHere.length > 0 && (
+                            <div className="absolute bottom-2 right-2 flex gap-1 flex-wrap max-w-[80%]">
+                              {teamsHere.map(team => (
+                                <div
+                                  key={team}
+                                  className={`w-7 h-7 rounded-full border-2 border-white shadow-lg transition-all duration-300 ${
+                                    animatingTeam === team ? 'scale-150 ring-4 ring-purple-400 z-20' : ''
+                                  }`}
+                                  style={{ backgroundColor: teamColors[team] }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {hasLadder && (
+                          <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg font-bold z-10">
+                            →11
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Start position (0) */}
+                <div className="absolute -left-20 top-8">
+                  <div className="bg-gradient-to-br from-gray-200 to-gray-300 w-16 h-16 rounded-2xl border-4 border-gray-400 flex items-center justify-center shadow-xl">
+                    <span className="font-bold text-gray-700 text-xs">START</span>
+                  </div>
+                  {getTeamsAtPosition(0).length > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center flex-wrap gap-1 p-2">
+                      {getTeamsAtPosition(0).map(team => (
+                        <div
+                          key={team}
+                          className={`w-5 h-5 rounded-full border-2 border-white shadow-lg transition-all duration-300 ${
+                            animatingTeam === team ? 'scale-150 ring-4 ring-purple-400' : ''
+                          }`}
+                          style={{ backgroundColor: teamColors[team] }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Teams and Dice - Takes 1 column */}
+            <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4">
+              <h2 className="text-xl font-bold text-gray-800 mb-3">Teams</h2>
+              <div className="space-y-2 mb-4">
+                {teams.map(team => (
+                  <div
+                    key={team}
+                    className={`flex items-center justify-between p-2 rounded-lg border-2 transition-all ${
+                      currentTeam === team && !winner
+                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                        : 'border-gray-200 bg-gray-50'
+                    } ${winner === team ? 'bg-yellow-100 border-yellow-400' : ''}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded-full border-2 border-white shadow-lg flex-shrink-0"
+                        style={{ backgroundColor: teamColors[team] }}
+                      />
+                      <span className="font-bold capitalize text-gray-700 text-xs">{team}</span>
+                      {winner === team && <Trophy className="w-3 h-3 text-yellow-600" />}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-base font-bold text-gray-600 min-w-[20px] text-center">
+                        {positions[team]}
+                      </span>
+                      <div className="flex gap-0.5">
+                        <button
+                          onClick={() => manualMove(team, 'backward')}
+                          disabled={positions[team] === 0 || winner}
+                          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                          title="Move backward"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => manualMove(team, 'forward')}
+                          disabled={positions[team] === 12 || winner}
+                          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                          title="Move forward"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Dice Section */}
+              <div className="text-center">
+                {diceValue && (
+                  <div className="mb-2 text-5xl font-bold text-purple-600 animate-bounce">
+                    {diceValue}
+                  </div>
+                )}
+                <button
+                  onClick={rollDice}
+                  disabled={winner || animatingTeam}
+                  className={`w-full py-3 rounded-xl font-bold text-base transition-all shadow-lg ${
+                    winner || animatingTeam
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 hover:shadow-xl transform hover:scale-105'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <Dices className="w-5 h-5" />
+                    <span className="text-sm">{winner ? 'Game Over' : animatingTeam ? 'Moving...' : `Roll (${currentTeam.toUpperCase()})`}</span>
+                  </div>
+                </button>
+                <button
+                  onClick={resetGame}
+                  className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md text-sm"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Game Log - Full Width Below */}
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-3">Game Log & Rules</h2>
+            
+            {/* Game Rules */}
+            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border-2 border-purple-200">
+              <h3 className="font-bold text-gray-700 mb-2 text-sm">Game Rules:</h3>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li>🎲 Roll the dice and move forward</li>
+                <li>⚡️ Stop 9 → Ladder to Stop 11</li>
+                <li>🏆 First team to reach Stop 12 wins!</li>
+                <li>↔️ Use manual controls to adjust team positions if needed</li>
+              </ul>
+            </div>
+
+            {/* Log */}
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {gameLog.length === 0 ? (
+                <p className="text-gray-400 text-center py-4 text-sm">Roll the dice to start!</p>
+              ) : (
+                gameLog.map((log, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 bg-gradient-to-r from-gray-50 to-purple-50 rounded-lg border border-purple-100 text-xs text-gray-700"
+                  >
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Winner Modal */}
+        {winner && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-3xl p-12 text-center shadow-2xl transform scale-110">
+              <Trophy className="w-24 h-24 mx-auto mb-4 text-yellow-500" />
+              <h2 className="text-5xl font-bold mb-4" style={{ color: teamColors[winner] }}>
+                {winner.toUpperCase()} WINS!
+              </h2>
+              <p className="text-gray-600 mb-6 text-xl">Congratulations! 🎉</p>
+              <button
+                onClick={resetGame}
+                className="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl font-bold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg"
+              >
+                Play Again
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SnakeLadderGame;
